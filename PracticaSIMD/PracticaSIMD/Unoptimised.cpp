@@ -11,18 +11,19 @@ Unoptimised::~Unoptimised()
 {
 }
 
-void Unoptimised::Add(float px, float py, float vx, float vy) {
-	Particle p = Particle(px, py, vx, vy);
+void Unoptimised::Add(float px, float py, float vx, float vy, float ax = 0.1f, float ay = -0.1f) {
+	Particle p = Particle(px, py, vx, vy, ax, ay);
 	particles.push_back(p);
 }
 
 void Unoptimised::Update(float dt) {
 
-	//old code
-	for (auto i = particles.begin(); i !=particles.end(); i++)
+	for (int p = 0; p < particles.size(); p++)
 	{
-		i->px += i->vx*dt;
-		i->py += i->vy*dt;
+		particles[p].vx += particles[p].ax*dt;
+		particles[p].vy += particles[p].ay*dt;
+		particles[p].px += particles[p].vx*dt;
+		particles[p].py += particles[p].vy*dt;
 	}
 }
 
@@ -41,7 +42,7 @@ void Unoptimised::test(){
 	float t0 = watch.time();
 	std::cout << t0 << "\n";
 
-	for (int i = 0; i < 1000000; i++)
+	for (int i = 0; i < 500000; i++)
 	{
 		Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
 	}

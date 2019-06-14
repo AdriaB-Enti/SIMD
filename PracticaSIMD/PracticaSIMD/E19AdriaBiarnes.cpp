@@ -1,62 +1,46 @@
 #pragma once
 #include "E19AdriaBiarnes.h"
-#include <immintrin.h>
 #include <thread>
 
 E19AdriaBiarnes::E19AdriaBiarnes()
 {
-
+	currentIndex = 0;
+	positions = std::vector<__m128>();
+	speeds = std::vector<__m128>();
+	accelerations = std::vector<__m128>();
 }
 
-void E19AdriaBiarnes::Add(float px, float py, float vx, float vy) {
-	Particle p = Particle(px, py, vx, vy);
-	particles.push_back(p);
+void E19AdriaBiarnes::Add(float px, float py, float vx, float vy, float ax = 0.1f, float ay = -0.1f) {
+
+	if (currentIndex == 0)
+	{
+		positions.push_back(_mm_set_ps1(0.0f));
+		speeds.push_back(_mm_set_ps1(0.0f));
+		accelerations.push_back(_mm_set_ps1(0.f));
+	}
+
+	//each __m128 contains two particles (and each particle has two floats: x, y)
+	reinterpret_cast<ParticleData*>(&positions.back())[currentIndex].x = px;
+	reinterpret_cast<ParticleData*>(&positions.back())[currentIndex].y = py;
+	reinterpret_cast<ParticleData*>(&speeds.back())[currentIndex].x = vx;
+	reinterpret_cast<ParticleData*>(&speeds.back())[currentIndex].y = vy;
+	reinterpret_cast<ParticleData*>(&accelerations.back())[currentIndex].x = ax;
+	reinterpret_cast<ParticleData*>(&accelerations.back())[currentIndex].y = ay;
+
+	currentIndex = ++currentIndex % 2;
 }
 
 void E19AdriaBiarnes::Update(float dt) {
 
-	int totalParticles = particles.size();
-
-	auto i = particles.begin();
-
-	__m128 valuesA = _mm_set_ps(dt, dt, dt, dt);
-
-	for (int part = 0; part < (int)(totalParticles / 2); part++)	//iterate every 2 particles
+	__m128 deltaVector = _mm_set_ps1(dt);
+	
+	auto v = speeds.begin();
+	auto a = accelerations.begin();
+	for (auto p = positions.begin(); p != positions.end(); p++, v++, a++)
 	{
-		Particle p1 = Particle(i->px, i->py, i->vx, i->vy);
-		Particle p2 = Particle(std::next(i,1)->px, std::next(i,1)->py, std::next(i,1)->vx, std::next(i,1)->vy);
-		
-		__m128 valuesB = _mm_set_ps(p1.vx, p1.vy, p2.vx, p2.vy);
-		__m128 valuesC = _mm_set_ps(p1.px, p1.py, p2.px, p2.py);
-
-		__m128 result = _mm_fmadd_ps(valuesA, valuesB, valuesC);	//A * B + C
-
-		i->px = result.m128_f32[3];
-		i->py = result.m128_f32[2];
-
-		++i;
-
-		i->px = result.m128_f32[1];
-		i->py = result.m128_f32[0];
-
-		++i;
+		*v = _mm_fmadd_ps(deltaVector, *a, *v);
+		*p = _mm_fmadd_ps(deltaVector, *v, *p);
 	}
-
-	//remainig particles
-	while (i != particles.end())
-	{
-		i->px += i->vx*dt;
-		i->py += i->vy*dt;
-
-		++i;
-	}
-
-	//old code
-	/*for (auto i = particles.begin(); i !=particles.end(); i++)
-	{
-		i->px += i->vx*dt;
-		i->py += i->vy*dt;
-	}*/
 }
 
 void E19AdriaBiarnes::test() {
@@ -65,7 +49,7 @@ void E19AdriaBiarnes::test() {
 	float t0 = watch.time();
 	std::cout << t0 << "\n";
 
-	for (int i = 0; i < 1000000; i++)
+	for (int i = 0; i < 500000; i++)
 	{
 		Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
 	}
@@ -87,7 +71,7 @@ void E19AdriaBiarnes::test() {
 }
 
 void E19AdriaBiarnes::Run(std::function<void(float x, float y)>f) {
-
+	//TODO: canviar
 	for (auto i = particles.begin(); i != particles.end(); ++i)
 	{
 		f(i->px, i->py);
