@@ -10,7 +10,7 @@ public:
 	struct Particle
 	{
 		float px, py, vx, vy, ax, ay;
-		Particle(float _px, float _py, float _vx, float _vy, float _ax, float _ay) :px(_px), py(_py), vx(_vx), vy(_vy), ax(ax), ay(ay) { }
+		Particle(float _px, float _py, float _vx, float _vy, float _ax, float _ay) :px(_px), py(_py), vx(_vx), vy(_vy), ax(_ax), ay(_ay) { }
 	};
 
 	struct StopWatch {

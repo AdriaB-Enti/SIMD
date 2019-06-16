@@ -42,15 +42,16 @@ void Unoptimised::test(){
 	float t0 = watch.time();
 	std::cout << t0 << "\n";
 
-	for (int i = 0; i < 500000; i++)
+	for (int i = 0; i < 50000; i++)
 	{
-		Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
+		//Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
+		Add(1.1f, 1.1f, 0.1f, 0.1f);
 	}
 
 	float t1 = watch.time();
 	std::cout << t1 << "\n";
 
-	for (int i = 0; i < 10000; i++)
+	for (int i = 0; i < 100000; i++)
 	{
 		Update(0.3f);
 	}
@@ -60,5 +61,6 @@ void Unoptimised::test(){
 	std::cout << t2 << "\n";
 
 	std::cout << "total time " << t2 - t1 << "\n";
-
+	std::cout << "first value " << particles.front().px << ":" << particles.front().py << std::endl;
+	std::cout << "final value " << particles.back().px << ":" << particles.back().py << std::endl;
 }
