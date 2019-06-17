@@ -42,7 +42,7 @@ void Unoptimised::test(){
 	float t0 = watch.time();
 	std::cout << t0 << "\n";
 
-	for (int i = 0; i < 50000; i++)
+	for (int i = 0; i < 80; i++) //50000
 	{
 		//Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
 		Add(1.1f, 1.1f, 0.1f, 0.1f);
@@ -51,7 +51,7 @@ void Unoptimised::test(){
 	float t1 = watch.time();
 	std::cout << t1 << "\n";
 
-	for (int i = 0; i < 100000; i++)
+	for (int i = 0; i < 20; i++) //100000
 	{
 		Update(0.3f);
 	}
