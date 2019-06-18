@@ -11,10 +11,9 @@ E19AdriaBiarnes::E19AdriaBiarnes()
 	threadsActive = true;
 
 	availableTasks = 0;
-	tasks = std::queue<Task>();	//std::thread::hardware_concurrency() - 1
-	for (int t = 0; t < 1; t++)
+	tasks = std::queue<Task>();
+	for (int t = 0; t < 2; t++) //std::thread::hardware_concurrency() - 1
 	{
-		std::cout << "creo thread\n";
 		threadPool.push_back(std::thread(&E19AdriaBiarnes::threadWorker, this));
 	}
 }
@@ -30,20 +29,17 @@ E19AdriaBiarnes::~E19AdriaBiarnes(){
 void E19AdriaBiarnes::threadWorker() {
 	std::mutex mutex;
 	Task currentTask = Task();
-	std::cout << "aqui thread\n";
 	while (threadsActive)
 	{
 		mutex.lock();
 		if (!tasks.empty())
 		{
-			std::cout << "agafo task\n";
 			currentTask = tasks.front();
 			tasks.pop();
 		}
 		mutex.unlock();
 		if (currentTask.started != false)
 		{
-			std::cout << "entro update\n";
 			currentTask.threadUpdate();
 			currentTask.started = false;
 			mutex.lock();
@@ -54,7 +50,6 @@ void E19AdriaBiarnes::threadWorker() {
 }
 
 void E19AdriaBiarnes::Add(float px, float py, float vx, float vy, float ax = 0.1f, float ay = -0.1f) {
-	std::cout << "Add\n";
 	if (lastAddedIndex == 0)
 	{
 		positions.push_back(_mm_set_ps1(0.0f));
@@ -77,9 +72,12 @@ void E19AdriaBiarnes::Update(float dt) {
 
 	std::mutex mutex;
 
-	int partPerThread = (int)std::ceil(particleCount / threadPool.size());
+	//TODO: make every task (except last one) have always an even number of particles
+	int partPerThread = (int)std::ceil((float)particleCount / (float)threadPool.size());
 	int extraPartThreads = particleCount % threadPool.size();
 	int currentThreadStart = 0;
+
+	int remainingParticles = 0;
 
 	for (int t = 0; t < threadPool.size(); t++)
 	{
@@ -92,27 +90,24 @@ void E19AdriaBiarnes::Update(float dt) {
 		{
 			task = Task(posStart, velStart, accStart, deltaVector, partPerThread + 1);
 			currentThreadStart += partPerThread + 1;
-			std::cout << "extraPart\n";
 		}
 		else
 		{
 			task = Task(posStart, velStart, accStart, deltaVector, partPerThread);
 			currentThreadStart += partPerThread;
 		}
-		std::cout << "creada tasca que acaba en " << currentThreadStart-1 << " i te " << (t < extraPartThreads ? partPerThread +1 : partPerThread ) << "particules\n";
 		mutex.lock();
 		tasks.push(task);
-		std::cout << "a tasks hi ha " << tasks.size() << "\n";
 		availableTasks++;
 		mutex.unlock();
 	}
 
 	while (true)	//wait until all tasks are finished
 	{
+		//TODO: use lock_guard
 		mutex.lock();
 		if (availableTasks == 0)
 		{
-			std::cout << "han acabat tots els threads\n";
 			mutex.unlock();
 			break;
 		}
@@ -134,7 +129,7 @@ void E19AdriaBiarnes::test() {
 	float t0 = watch.time();
 	std::cout << t0 << "\n";
 
-	for (int i = 0; i < 80; i++) //50000
+	for (int i = 0; i < 4; i++) //50000
 	{
 		//Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
 		Add(1.1f, 1.1f, 0.1f, 0.1f);
@@ -143,7 +138,7 @@ void E19AdriaBiarnes::test() {
 	float t1 = watch.time();
 	std::cout << t1 << "\n";
 
-	for (int i = 0; i < 20; i++) //100000
+	for (int i = 0; i < 1; i++) //100000
 	{
 		Update(0.3f);
 	}
@@ -154,17 +149,18 @@ void E19AdriaBiarnes::test() {
 
 	std::cout << "total time " << t2 - t1 << "\n";
 	
-	std::cout << "first value1 " << positions.begin()->m128_f32[0] << ":";
+	std::cout << "first value " << positions.begin()->m128_f32[0] << ":";
 	std::cout << positions.begin()->m128_f32[1] << std::endl;
-	std::cout << "final value1 " << positions.back().m128_f32[lastAddedIndex*2] << ":";
-	std::cout << positions.back().m128_f32[1 + lastAddedIndex * 2] << std::endl;
+	//std::cout << "LAST INDEX " << lastAddedIndex << "\n";
+	std::cout << "final value " << positions.back().m128_f32[lastAddedIndex == 1 ? 0 : 2] << ":";
+	std::cout << positions.back().m128_f32[lastAddedIndex == 1 ? 1 : 3] << std::endl;
 }
 
 void E19AdriaBiarnes::Run(std::function<void(float x, float y)>f) {
 	for (auto p = positions.begin(); p != positions.end(); p++)
 	{
 		f(p->m128_f32[0], p->m128_f32[1]); // x, y
-		if (p < positions.end()-1 || lastAddedIndex != 0) //last element might or might not have 2 particles (but at least 1)
+		if (p < positions.end()-1 || lastAddedIndex == 0) //last element might or might not have 2 particles (but at least 1)
 		{
 			f(p->m128_f32[2], p->m128_f32[3]);
 		}

@@ -51,19 +51,16 @@ public:
 			posStart = _posStart;
 			velStart = _velStart;
 			accStart = _accStart;
-			nPartclPairs = _nparticles / 2;
+			nPartclPairs = (int) ceil((float) _nparticles / 2.0f);
 			dt = _dt;
 		}
 		Task() {
 			started = false;
 		}
 		void threadUpdate() {
-			std::cout << "dins update\n";
-			std::cout << "AMB N PARTICLES = " << nPartclPairs << "\n";
-			for (int pp = 0; pp < nPartclPairs; pp++, posStart++, velStart++, accStart++)	//NO TENIM EN COMPTE QUE COMENCEM AL MIG DUN __M128 O QUE ACABEM AL FINAL D'UN __M128
+			for (int pp = 0; pp < nPartclPairs; pp++, posStart++, velStart++, accStart++)
 			{
-				std::cout << "update part " << pp << std::endl;
-				*velStart = _mm_fmadd_ps(dt, *accStart, *velStart);
+				*velStart = _mm_fmadd_ps(dt, *accStart, *velStart);		//doesn't care of odd/even nº of particles
 				*posStart = _mm_fmadd_ps(dt, *velStart, *posStart);
 			}
 		}
