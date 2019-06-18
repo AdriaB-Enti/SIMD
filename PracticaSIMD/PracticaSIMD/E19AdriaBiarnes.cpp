@@ -1,6 +1,8 @@
 #pragma once
 #include "E19AdriaBiarnes.h"
 
+std::mutex mutex;
+
 E19AdriaBiarnes::E19AdriaBiarnes()
 {
 	lastAddedIndex = 0;
@@ -12,14 +14,16 @@ E19AdriaBiarnes::E19AdriaBiarnes()
 
 	availableTasks = 0;
 	tasks = std::queue<Task>();
-	for (int t = 0; t < 2; t++) //std::thread::hardware_concurrency() - 1
+	for (int t = 0; t < std::thread::hardware_concurrency() - 1; t++) //std::thread::hardware_concurrency() - 1
 	{
 		threadPool.push_back(std::thread(&E19AdriaBiarnes::threadWorker, this));
 	}
 }
 
 E19AdriaBiarnes::~E19AdriaBiarnes(){
+	mutex.lock();
 	threadsActive = false;
+	mutex.unlock();
 	for (int t = 0; t < threadPool.size(); t++)
 	{
 		threadPool[t].join();
@@ -27,8 +31,8 @@ E19AdriaBiarnes::~E19AdriaBiarnes(){
 }
 
 void E19AdriaBiarnes::threadWorker() {
-	std::mutex mutex;
 	Task currentTask = Task();
+	bool working = false;
 	while (threadsActive)
 	{
 		mutex.lock();
@@ -36,15 +40,16 @@ void E19AdriaBiarnes::threadWorker() {
 		{
 			currentTask = tasks.front();
 			tasks.pop();
+			working = true;
 		}
 		mutex.unlock();
-		if (currentTask.started != false)
+		if (working)
 		{
 			currentTask.threadUpdate();
-			currentTask.started = false;
 			mutex.lock();
 			availableTasks--;
 			mutex.unlock();
+			working = false;
 		}
 	}
 }
@@ -70,48 +75,62 @@ void E19AdriaBiarnes::Update(float dt) {
 
 	__m128 deltaVector = _mm_set_ps1(dt);
 
-	std::mutex mutex;
-
 	//TODO: make every task (except last one) have always an even number of particles
-	int partPerThread = (int)std::ceil((float)particleCount / (float)threadPool.size());
-	int extraPartThreads = particleCount % threadPool.size();
-	int currentThreadStart = 0;
+	//int partPerThread = (int)std::ceil((float)particleCount / (float)threadPool.size());
+	int partPerThread = particleCount / threadPool.size();
+	if (partPerThread % 2 != 0) //each thread mus have an even number of particles
+	{
+		partPerThread++;
+	}
 
-	int remainingParticles = 0;
+	int currentThreadStart = 0;
+	int remainingParticles = particleCount;
 
 	for (int t = 0; t < threadPool.size(); t++)
 	{
-		std::vector<__m128>::iterator posStart = positions.begin() + currentThreadStart;
-		std::vector<__m128>::iterator velStart = speeds.begin() + currentThreadStart;
-		std::vector<__m128>::iterator accStart = accelerations.begin() + currentThreadStart;
+		//currentThreadStart uses nº of particles, but vector elements work in pairs of 2 particles each
+		std::vector<__m128>::iterator posStart = positions.begin() + currentThreadStart/2;
+		std::vector<__m128>::iterator velStart = speeds.begin() + currentThreadStart/2;
+		std::vector<__m128>::iterator accStart = accelerations.begin() + currentThreadStart/2;
 
 		Task task;
-		if (t < extraPartThreads)
+
+		if (t == threadPool.size()-1)
 		{
-			task = Task(posStart, velStart, accStart, deltaVector, partPerThread + 1);
-			currentThreadStart += partPerThread + 1;
+			task = Task(posStart, velStart, accStart, deltaVector, remainingParticles);
+			remainingParticles = 0;
+
+			mutex.lock();
+			tasks.push(task);
+			availableTasks++;
+			mutex.unlock();
 		}
 		else
 		{
 			task = Task(posStart, velStart, accStart, deltaVector, partPerThread);
+			remainingParticles -= partPerThread;
 			currentThreadStart += partPerThread;
+
+			mutex.lock();
+			tasks.push(task);
+			availableTasks++;
+			mutex.unlock();
 		}
-		mutex.lock();
-		tasks.push(task);
-		availableTasks++;
-		mutex.unlock();
+
+
+		if (remainingParticles <= 0)
+		{
+			break;
+		}
 	}
 
 	while (true)	//wait until all tasks are finished
 	{
-		//TODO: use lock_guard
-		mutex.lock();
 		if (availableTasks == 0)
 		{
-			mutex.unlock();
 			break;
 		}
-		mutex.unlock();
+		std::this_thread::yield();
 	}
 
 	/*auto v = speeds.begin();
@@ -129,7 +148,7 @@ void E19AdriaBiarnes::test() {
 	float t0 = watch.time();
 	std::cout << t0 << "\n";
 
-	for (int i = 0; i < 4; i++) //50000
+	for (int i = 0; i < 80000; i++) //50000
 	{
 		//Add(rand() * 10, rand() * 10, rand() * 3, rand() * 3);
 		Add(1.1f, 1.1f, 0.1f, 0.1f);
@@ -138,7 +157,7 @@ void E19AdriaBiarnes::test() {
 	float t1 = watch.time();
 	std::cout << t1 << "\n";
 
-	for (int i = 0; i < 1; i++) //100000
+	for (int i = 0; i < 80000; i++) //100000
 	{
 		Update(0.3f);
 	}
